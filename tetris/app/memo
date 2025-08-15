@@ -1,0 +1,17 @@
+app/
+ ├─ build.gradle
+ └─ src/main/
+     ├─ AndroidManifest.xml
+     ├─ java/com/example/tetris/
+     │   ├─ MainActivity.kt
+     │   ├─ GameView.kt
+     │   └─ NativeBridge.kt
+     ├─ cpp/
+     │   ├─ CMakeLists.txt
+     │   ├─ jni_bridge.cpp
+     │   ├─ game.hpp
+     │   └─ game.cpp
+     └─ res/
+         ├─ layout/activity_main.xml
+         ├─ values/colors.xml
+         └─ values/strings.xml

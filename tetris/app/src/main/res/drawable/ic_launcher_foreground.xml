@@ -1,0 +1,11 @@
+
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- “テトリミノそのもの”は避け、四角形を並べたポップ表現に -->
+    <path android:fillColor="#FFFFFF" android:pathData="M20,20h24v24h-24z"/>
+    <path android:fillColor="#1A000000" android:pathData="M20,20h24v24h-24z" android:fillAlpha="0.1"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M44,40h24v24h-24z"/>
+    <path android:fillColor="#1A000000" android:pathData="M44,40h24v24h-24z" android:fillAlpha="0.1"/>
+    <path android:fillColor="#FFFFFF" android:pathData="M68,20h24v24h-24z"/>
+    <path android:fillColor="#1A000000" android:pathData="M68,20h24v24h-24z" android:fillAlpha="0.1"/>
+</vector>
