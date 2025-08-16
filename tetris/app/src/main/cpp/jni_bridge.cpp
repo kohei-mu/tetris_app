@@ -25,6 +25,16 @@ Java_com_game_tetris_NativeBridge_readBoard(JNIEnv* env, jobject /*thiz*/) {
     return arr;
 }
 
+extern "C" JNIEXPORT jintArray JNICALL
+Java_com_game_tetris_NativeBridge_ghostPositions(JNIEnv* env, jobject /*thiz*/) {
+    auto gpos = g.ghostPositions();
+    jintArray arr = env->NewIntArray(8);
+    jint tmp[8];
+    for(int i=0;i<8;++i) tmp[i] = gpos[i];
+    env->SetIntArrayRegion(arr, 0, 8, tmp);
+    return arr;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_game_tetris_NativeBridge_score(JNIEnv* /*env*/, jobject /*thiz*/) {
     return g.score();
