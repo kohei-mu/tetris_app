@@ -30,6 +30,15 @@ class GameView(ctx: Context, attrs: AttributeSet? = null) :
 
     // HUD/ブロック描画用
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pieceColors = intArrayOf(
+        Color.parseColor("#00BCD4"), // I
+        Color.parseColor("#FFEB3B"), // O
+        Color.parseColor("#4CAF50"), // S
+        Color.parseColor("#F44336"), // Z
+        Color.parseColor("#3F51B5"), // J
+        Color.parseColor("#FF9800"), // L
+        Color.parseColor("#9C27B0")  // T
+    )
 
     // ポーズ＆タイマー
     private var paused = false
@@ -127,9 +136,10 @@ class GameView(ctx: Context, attrs: AttributeSet? = null) :
     private fun drawFrame() {
         val canvas = holder.lockCanvas() ?: return
         try {
-            canvas.drawColor(Color.BLACK)
+            canvas.drawColor(Color.parseColor("#FFF8E1"))
 
             val cells = NativeBridge.readBoard()
+            val ghost = NativeBridge.ghostPositions()
             val cell = min(width / cols, height / rows).toFloat()
             val offsetX = (width - cols * cell) / 2f
             val offsetY = (height - rows * cell) / 2f
@@ -137,8 +147,19 @@ class GameView(ctx: Context, attrs: AttributeSet? = null) :
             // 枠
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 4f
-            paint.color = Color.DKGRAY
+            paint.color = Color.LTGRAY
             canvas.drawRect(offsetX, offsetY, offsetX + cols * cell, offsetY + rows * cell, paint)
+
+            // ゴースト
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(80, 200, 200, 200)
+            for (i in ghost.indices step 2) {
+                val gx = ghost[i]
+                val gy = ghost[i + 1]
+                val l = offsetX + gx * cell
+                val t = offsetY + gy * cell
+                canvas.drawRect(l, t, l + cell, t + cell, paint)
+            }
 
             // ブロック
             for (y in 0 until rows) {
@@ -149,15 +170,10 @@ class GameView(ctx: Context, attrs: AttributeSet? = null) :
                         val l = offsetX + x * cell
                         val t = offsetY + y * cell
 
-                        // 塗り
                         paint.style = Paint.Style.FILL
-                        val base = (50 + v * 25).coerceIn(0, 255)
-                        val g = (base + 40).coerceIn(0, 255)
-                        val b = (base + 70).coerceIn(0, 255)
-                        paint.color = Color.rgb(base, g, b)
+                        paint.color = pieceColors[v - 1]
                         canvas.drawRect(l, t, l + cell, t + cell, paint)
 
-                        // 枠線
                         paint.style = Paint.Style.STROKE
                         paint.color = Color.argb(255, 30, 30, 30)
                         canvas.drawRect(l, t, l + cell, t + cell, paint)

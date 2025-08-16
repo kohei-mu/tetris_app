@@ -3,7 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent" android:layout_height="match_parent"
-    android:background="@android:color/black">
+    android:background="@color/background">
 
     <com.game.tetris.GameView
         android:id="@+id/gameView"
@@ -28,6 +28,16 @@
         android:text="HARD DROP ⤓"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnResume"
+        android:layout_width="120dp" android:layout_height="48dp"
+        android:text="RESUME"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginEnd="12dp"
         android:layout_marginBottom="12dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -229,6 +229,22 @@ int Game::fallDistance(const Piece& p) const{
     return dist;
 }
 
+std::array<int,8> Game::ghostPositions() const{
+    std::array<int,8> out{};
+    Piece g = cur_;
+    g.y += fallDistance(cur_);
+    const auto& s = shape(g.type, g.rot);
+    int idx = 0;
+    for(int dy=0; dy<4; ++dy){
+        for(int dx=0; dx<4; ++dx){
+            if(!s[dy*4+dx]) continue;
+            out[idx++] = g.x + dx;
+            out[idx++] = g.y + dy;
+        }
+    }
+    return out;
+}
+
 void Game::lockPiece(){
     // 既に stampPiece(true) で置かれている前提
     // 固定後の行消去
