@@ -10,6 +10,7 @@ object NativeBridge {
     external fun update(dt: Float)
     external fun command(cmd: Int)
     external fun readBoard(): IntArray
+    external fun ghostPositions(): IntArray
     external fun score(): Int
     external fun level(): Int
     external fun isGameOver(): Boolean
