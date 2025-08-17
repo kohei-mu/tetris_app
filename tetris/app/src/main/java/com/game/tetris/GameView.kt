@@ -136,7 +136,8 @@ class GameView(ctx: Context, attrs: AttributeSet? = null) :
     private fun drawFrame() {
         val canvas = holder.lockCanvas() ?: return
         try {
-            canvas.drawColor(Color.parseColor("#FFF8E1"))
+            // 背景を黒にして HUD の白文字を見やすくする
+            canvas.drawColor(Color.BLACK)
 
             val cells = NativeBridge.readBoard()
             val ghost = NativeBridge.ghostPositions()
