@@ -34,7 +34,8 @@ public:
     int score() const { return score_; }
     int level() const { return level_; }
     bool gameOver() const { return gameOver_; }
-    std::array<int,8> ghostPositions() const;
+    // 落下中のミノを一時的に盤から取り除き、ゴースト位置を計算
+    std::array<int,8> ghostPositions();
 
 private:
     const Shape& shape(int type, int rot) const;

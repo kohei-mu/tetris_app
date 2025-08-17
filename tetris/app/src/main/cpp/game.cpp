@@ -229,10 +229,18 @@ int Game::fallDistance(const Piece& p) const{
     return dist;
 }
 
-std::array<int,8> Game::ghostPositions() const{
+std::array<int,8> Game::ghostPositions(){
     std::array<int,8> out{};
+
+    // 現在のミノを一旦盤から外して自己衝突を避ける
+    stampPiece(false);
+
     Piece g = cur_;
-    g.y += fallDistance(cur_);
+    g.y += fallDistance(g);
+
+    // 描画が終わったら盤に戻す
+    stampPiece(true);
+
     const auto& s = shape(g.type, g.rot);
     int idx = 0;
     for(int dy=0; dy<4; ++dy){

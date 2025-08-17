@@ -14,15 +14,6 @@
         app:layout_constraintEnd_toEndOf="parent"/>
 
     <Button
-        android:id="@+id/btnPause"
-        android:layout_width="120dp" android:layout_height="48dp"
-        android:text="PAUSE"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="12dp"/>
-
-    <Button
         android:id="@+id/btnDrop"
         android:layout_width="160dp" android:layout_height="56dp"
         android:text="HARD DROP ⤓"
@@ -34,8 +25,7 @@
     <Button
         android:id="@+id/btnResume"
         android:layout_width="120dp" android:layout_height="48dp"
-        android:text="RESUME"
-        android:visibility="gone"
+        android:text="PAUSE"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginEnd="12dp"
