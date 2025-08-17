@@ -1,7 +1,6 @@
 package com.game.tetris
 
 import android.os.Bundle
-import android.view.View
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 
@@ -18,11 +17,12 @@ class MainActivity : AppCompatActivity() {
         gameView = findViewById(R.id.gameView)
 
         btnResume = findViewById(R.id.btnResume)
-        btnResume.visibility = View.GONE
+        btnResume.text = "PAUSE"
 
         btnResume.setOnClickListener {
-            paused = false
-            gameView.setPaused(false)
+            paused = !paused
+            gameView.setPaused(paused)
+            btnResume.text = if (paused) "RESUME" else "PAUSE"
         }
 
         val btnDrop: Button = findViewById(R.id.btnDrop)
@@ -35,6 +35,6 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         paused = true
         gameView.setPaused(true)
-        btnResume.visibility = View.VISIBLE
+        btnResume.text = "RESUME"
     }
 }
