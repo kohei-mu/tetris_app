@@ -8,7 +8,8 @@ import androidx.appcompat.app.AppCompatActivity
 class MainActivity : AppCompatActivity() {
 
     private lateinit var gameView: GameView
-    private var paused = true
+    private lateinit var btnResume: Button
+    private var paused = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -16,11 +17,8 @@ class MainActivity : AppCompatActivity() {
 
         gameView = findViewById(R.id.gameView)
 
-        val btnResume: Button = findViewById(R.id.btnResume)
-        btnResume.visibility = View.VISIBLE
-
-        // GameView が生成された後にポーズ状態を反映させる
-        gameView.post { gameView.setPaused(true) }
+        btnResume = findViewById(R.id.btnResume)
+        btnResume.visibility = View.GONE
 
         btnResume.setOnClickListener {
             paused = false
@@ -32,5 +30,12 @@ class MainActivity : AppCompatActivity() {
         btnDrop.setOnClickListener {
             if (!paused) NativeBridge.command(NativeBridge.HARD_DROP)
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        paused = true
+        gameView.setPaused(true)
+        btnResume.visibility = View.VISIBLE
     }
 }
