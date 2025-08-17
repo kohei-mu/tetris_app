@@ -22,7 +22,6 @@ class MainActivity : AppCompatActivity() {
         btnResume.setOnClickListener {
             paused = false
             gameView.setPaused(false)
-            btnResume.visibility = View.GONE
         }
 
         val btnDrop: Button = findViewById(R.id.btnDrop)
