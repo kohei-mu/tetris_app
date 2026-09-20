@@ -1,0 +1,49 @@
+name: Android CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Set build date
+        shell: bash
+        run: echo "BUILD_DATE=$(TZ=Asia/Tokyo date +'%Y%m%d')" >> "$GITHUB_ENV"
+      - name: Grant execute permission
+        working-directory: tetris
+        run: chmod +x gradlew
+      - name: Native C++ tests
+        run: |
+          cmake -S tetris/native-tests -B tetris/native-tests/build
+          cmake --build tetris/native-tests/build --parallel
+          ctest --test-dir tetris/native-tests/build --output-on-failure
+      - name: Android unit tests
+        working-directory: tetris
+        run: ./gradlew testDebugUnitTest
+      - name: Android lint
+        working-directory: tetris
+        run: ./gradlew lintDebug
+      - name: Build Debug APK
+        working-directory: tetris
+        run: ./gradlew assembleDebug
+      - name: Rename APK
+        shell: bash
+        run: mv tetris/app/build/outputs/apk/debug/app-debug.apk "tetris/app/build/outputs/apk/debug/ClassicTetris-${BUILD_DATE}-debug.apk"
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClassicTetris-${{ env.BUILD_DATE }}-debug
+          path: tetris/app/build/outputs/apk/debug/ClassicTetris-${{ env.BUILD_DATE }}-debug.apk
+          if-no-files-found: error

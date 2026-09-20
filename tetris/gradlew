@@ -40,6 +40,33 @@ cd "`dirname \"$PRG\"`/" >/dev/null
 APP_HOME="`pwd -P`"
 cd "$SAVED" >/dev/null
 
+# Some code-review transports used for this repository reject binary files, so
+# the small Gradle wrapper bootstrap JAR is downloaded on first use instead of
+# being committed. The pinned checksum keeps this equivalent to a checked-in
+# wrapper and prevents executing an unexpected download.
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+WRAPPER_URL="https://raw.githubusercontent.com/gradle/gradle/v8.13.0/gradle/wrapper/gradle-wrapper.jar"
+WRAPPER_SHA256="81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f"
+if [ ! -f "$WRAPPER_JAR" ]; then
+    command -v curl >/dev/null 2>&1 || {
+        echo "ERROR: curl is required to bootstrap the Gradle wrapper." >&2
+        exit 1
+    }
+    echo "Downloading the pinned Gradle wrapper bootstrap JAR..." >&2
+    curl --fail --location --silent --show-error "$WRAPPER_URL" --output "$WRAPPER_JAR.tmp" || exit 1
+    if command -v sha256sum >/dev/null 2>&1; then
+        ACTUAL_SHA256=`sha256sum "$WRAPPER_JAR.tmp" | awk '{print $1}'`
+    else
+        ACTUAL_SHA256=`shasum -a 256 "$WRAPPER_JAR.tmp" | awk '{print $1}'`
+    fi
+    if [ "$ACTUAL_SHA256" != "$WRAPPER_SHA256" ]; then
+        rm -f "$WRAPPER_JAR.tmp"
+        echo "ERROR: Gradle wrapper checksum verification failed." >&2
+        exit 1
+    fi
+    mv "$WRAPPER_JAR.tmp" "$WRAPPER_JAR"
+fi
+
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
@@ -80,7 +107,7 @@ case "`uname`" in
     ;;
 esac
 
-CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
+CLASSPATH=$WRAPPER_JAR
 
 
 # Determine the Java command to use to start the JVM.

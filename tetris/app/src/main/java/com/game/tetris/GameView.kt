@@ -1,216 +1,143 @@
 package com.game.tetris
 
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.min
 
-/**
- * ゲーム描画と入力を担当する SurfaceView。
- * - タップ：右回転
- * - ドラッグ（横）：左右移動（しきい値ごとに1マス）
- * - ドラッグ（下）：ソフトドロップ
- * - ポーズ中は入力無効＆落下停止（Native/C++側も停止）
- * - 画面左上に Score/Level、下に経過Timeを表示
- */
-class GameView(ctx: Context, attrs: AttributeSet? = null) :
-    SurfaceView(ctx, attrs), SurfaceHolder.Callback {
+class GameView(context: Context, attrs: AttributeSet? = null) :
+    SurfaceView(context, attrs), SurfaceHolder.Callback {
 
-    // 盤サイズ（描画・入力のしきい値計算用）
-    private val cols = 10
-    private val rows = 22 // 上2段表示込み
-
-    // ループ制御
-    private var running = false
+    private val commands = ConcurrentLinkedQueue<Int>()
+    @Volatile private var running = false
+    @Volatile private var paused = false
+    @Volatile private var gameOver = false
+    private var gameThread: Thread? = null
+    private var initialized = false
     private var lastNs = 0L
-
-    // HUD/ブロック描画用
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val pieceColors = intArrayOf(
-        Color.parseColor("#00BCD4"), // I
-        Color.parseColor("#FFEB3B"), // O
-        Color.parseColor("#4CAF50"), // S
-        Color.parseColor("#F44336"), // Z
-        Color.parseColor("#3F51B5"), // J
-        Color.parseColor("#FF9800"), // L
-        Color.parseColor("#9C27B0")  // T
-    )
-
-    // ポーズ＆タイマー
-    private var paused = false
     private var elapsedSec = 0f
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val density = resources.displayMetrics.density
+    private val scaledDensity = resources.displayMetrics.scaledDensity
+    private val colors = intArrayOf(0xFF00BCD4.toInt(), 0xFFFFEB3B.toInt(), 0xFF4CAF50.toInt(),
+        0xFFF44336.toInt(), 0xFF3F51B5.toInt(), 0xFFFF9800.toInt(), 0xFF9C27B0.toInt())
 
-    // タッチ入力の累積
     private var downX = 0f; private var downY = 0f
     private var lastX = 0f; private var lastY = 0f
-    private var accX = 0f;  private var accY = 0f
-    private var moved = false
+    private var accX = 0f; private var accY = 0f; private var moved = false
 
-    init {
-        holder.addCallback(this)
-        isFocusable = true
+    init { holder.addCallback(this); isFocusable = true }
+
+    override fun surfaceCreated(holder: SurfaceHolder) {
+        synchronized(this) {
+            if (gameThread?.isAlive == true) return
+            running = true
+            lastNs = System.nanoTime()
+            gameThread = Thread(::loop, "TetrisGame").also { it.start() }
+        }
     }
 
-    // --- Surface lifecycle ----------------------------------------------------
-
-    override fun surfaceCreated(h: SurfaceHolder) {
-        // ★初手からランダムになるよう seed 付き初期化
-        NativeBridge.initWithSeed((System.currentTimeMillis() and 0xFFFF_FFFFL).toInt())
-        elapsedSec = 0f
-        paused = false
-
-        running = true
-        lastNs = System.nanoTime()
-        Thread { loop() }.start()
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        running = false
+        val thread = gameThread
+        thread?.interrupt()
+        try { thread?.join(2_000) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+        synchronized(this) { if (gameThread === thread) gameThread = null }
     }
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
 
-    override fun surfaceDestroyed(h: SurfaceHolder) { running = false }
-    override fun surfaceChanged(h: SurfaceHolder, f: Int, w: Int, hgt: Int) = Unit
+    fun togglePause() { if (!gameOver) commands.add(if (paused) RESUME else PAUSE) }
+    fun pause() { commands.add(PAUSE) }
+    fun hardDrop() { if (!paused && !gameOver) commands.add(NativeBridge.HARD_DROP) }
+    fun restart() { commands.clear(); commands.add(RESTART) }
+    fun isPaused(): Boolean = paused
+    fun isGameOver(): Boolean = gameOver
 
-    // --- 入力（タップ回転／ドラッグ移動・下落） -----------------------------
-
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        // ポーズ中・ゲームオーバー中は入力を食いつぶす
-        if (NativeBridge.isGameOver() || paused) return true
-
-        val cell = min(width / cols, height / rows).toFloat()
-        when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                downX = e.x; downY = e.y
-                lastX = e.x; lastY = e.y
-                accX = 0f; accY = 0f; moved = false
-            }
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (paused || gameOver) return true
+        val cell = min(width / 10f, height / 20f)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { downX=event.x; downY=event.y; lastX=event.x; lastY=event.y; accX=0f; accY=0f; moved=false }
             MotionEvent.ACTION_MOVE -> {
-                val dx = e.x - lastX
-                val dy = e.y - lastY
-                lastX = e.x; lastY = e.y
-
-                accX += dx
-                accY += dy
-
-                // しきい値（1/2セル分）ごとにコマンド送信
-                val step = cell * 0.5f
-                while (accX > step)  { NativeBridge.command(NativeBridge.RIGHT); accX -= step; moved = true }
-                while (accX < -step) { NativeBridge.command(NativeBridge.LEFT);  accX += step; moved = true }
-                while (accY > step)  { NativeBridge.command(NativeBridge.SOFT_DROP); accY -= step; moved = true }
+                accX += event.x-lastX; accY += event.y-lastY; lastX=event.x; lastY=event.y
+                val step = cell * .5f
+                while (accX > step) { commands.add(NativeBridge.RIGHT); accX-=step; moved=true }
+                while (accX < -step) { commands.add(NativeBridge.LEFT); accX+=step; moved=true }
+                while (accY > step) { commands.add(NativeBridge.SOFT_DROP); accY-=step; moved=true }
             }
             MotionEvent.ACTION_UP -> {
-                // ほぼ動いていない＝タップ：右回転
-                val dx = e.x - downX
-                val dy = e.y - downY
-                val tapThresh = cell * 0.25f
-                if (!moved && (dx*dx + dy*dy) < tapThresh*tapThresh) {
-                    NativeBridge.command(NativeBridge.ROTATE_CW)
+                val dx=event.x-downX; val dy=event.y-downY; val threshold=cell*.25f
+                if (!moved && dx*dx+dy*dy < threshold*threshold) {
+                    commands.add(NativeBridge.ROTATE_CW)
+                    performClick()
                 }
             }
         }
         return true
     }
 
-    // --- メインループ --------------------------------------------------------
+    override fun performClick(): Boolean { super.performClick(); return true }
 
     private fun loop() {
+        if (!initialized) { NativeBridge.restart(newSeed()); initialized = true }
         while (running) {
-            val now = System.nanoTime()
-            val dt = (now - lastNs) / 1_000_000_000f
-            lastNs = now
-
-            if (!paused && !NativeBridge.isGameOver()) {
-                elapsedSec += dt
-            }
-
-            // ネイティブ側の進行。フレーム落ちを防ぐため dt は上限をかける
-            NativeBridge.update(dt.coerceAtMost(0.05f))
-            drawFrame()
-
-            try { Thread.sleep(16) } catch (_: InterruptedException) {}
+            val now=System.nanoTime(); val dt=((now-lastNs)/1_000_000_000f).coerceAtMost(.05f); lastNs=now
+            drainCommands()
+            if (!paused && !gameOver) elapsedSec += dt
+            NativeBridge.update(dt)
+            val snapshot=NativeBridge.renderSnapshot()
+            paused=snapshot[238] != 0; gameOver=snapshot[239] != 0
+            drawFrame(snapshot)
+            try { Thread.sleep(16) } catch (_: InterruptedException) { if (!running) break }
         }
     }
 
-    // --- 描画 ----------------------------------------------------------------
+    private fun drainCommands() {
+        while (true) when (val command=commands.poll() ?: break) {
+            PAUSE -> NativeBridge.setPaused(true)
+            RESUME -> NativeBridge.setPaused(false)
+            RESTART -> { NativeBridge.restart(newSeed()); elapsedSec=0f }
+            else -> NativeBridge.command(command)
+        }
+    }
 
-    private fun drawFrame() {
-        val canvas = holder.lockCanvas() ?: return
+    private fun drawFrame(data: IntArray) {
+        val canvas=holder.lockCanvas() ?: return
         try {
-            // 背景を黒にして HUD の白文字を見やすくする
             canvas.drawColor(Color.BLACK)
-
-            val cells = NativeBridge.readBoard()
-            val ghost = NativeBridge.ghostPositions()
-            val cell = min(width / cols, height / rows).toFloat()
-            val offsetX = (width - cols * cell) / 2f
-            val offsetY = (height - rows * cell) / 2f
-
-            // 枠
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 4f
-            paint.color = Color.LTGRAY
-            canvas.drawRect(offsetX, offsetY, offsetX + cols * cell, offsetY + rows * cell, paint)
-
-            // ゴースト
-            paint.style = Paint.Style.FILL
-            paint.color = Color.argb(80, 200, 200, 200)
-            for (i in ghost.indices step 2) {
-                val gx = ghost[i]
-                val gy = ghost[i + 1]
-                val l = offsetX + gx * cell
-                val t = offsetY + gy * cell
-                canvas.drawRect(l, t, l + cell, t + cell, paint)
+            val hud=64f*density; val bottom=72f*density
+            val cell=min(width/10f, (height-hud-bottom)/20f)
+            val left=(width-cell*10)/2f; val top=hud+(height-hud-bottom-cell*20)/2f
+            paint.style=Paint.Style.STROKE; paint.strokeWidth=2f*density; paint.color=Color.LTGRAY
+            canvas.drawRect(left,top,left+cell*10,top+cell*20,paint)
+            drawPositions(canvas,data,228,Color.argb(80,200,200,200),cell,left,top)
+            for (y in 2 until 22) for (x in 0 until 10) {
+                val value=data[y*10+x]; if (value != 0) drawCell(canvas,x,y-2,colors[value-1],cell,left,top)
             }
-
-            // ブロック
-            for (y in 0 until rows) {
-                for (x in 0 until cols) {
-                    val i = y * cols + x
-                    val v = if (i < cells.size) cells[i] else 0
-                    if (v != 0) {
-                        val l = offsetX + x * cell
-                        val t = offsetY + y * cell
-
-                        paint.style = Paint.Style.FILL
-                        paint.color = pieceColors[v - 1]
-                        canvas.drawRect(l, t, l + cell, t + cell, paint)
-
-                        paint.style = Paint.Style.STROKE
-                        paint.color = Color.argb(255, 30, 30, 30)
-                        canvas.drawRect(l, t, l + cell, t + cell, paint)
-                    }
-                }
-            }
-
-            // HUD（Score / Level / Time）
-            paint.style = Paint.Style.FILL
-            paint.color = Color.WHITE
-            paint.textSize = 42f
-            canvas.drawText("Score: ${NativeBridge.score()}", 16f, 50f, paint)
-            canvas.drawText("Level: ${NativeBridge.level()}", 16f, 96f, paint)
-
-            val mm = (elapsedSec / 60f).toInt()
-            val ss = (elapsedSec % 60f).toInt()
-            canvas.drawText(String.format("Time: %02d:%02d", mm, ss), 16f, 142f, paint)
-
-            if (NativeBridge.isGameOver()) {
-                paint.textSize = 64f
-                canvas.drawText("GAME OVER", width / 2f - 180f, height / 2f, paint)
-            } else if (paused) {
-                paint.textSize = 64f
-                canvas.drawText("PAUSED", width / 2f - 120f, height / 2f, paint)
-            }
-        } finally {
-            holder.unlockCanvasAndPost(canvas)
-        }
+            // Active piece is deliberately separate from the locked board.
+            drawPositions(canvas,data,220,Color.WHITE,cell,left,top)
+            paint.style=Paint.Style.FILL; paint.color=Color.WHITE; paint.textSize=18f*scaledDensity
+            canvas.drawText("Score ${data[236]}   Level ${data[237]}   Time ${formatTime()}",16f*density,38f*density,paint)
+            if (gameOver) overlay(canvas,"GAME OVER\nScore: ${data[236]}") else if (paused) overlay(canvas,"PAUSED")
+        } finally { holder.unlockCanvasAndPost(canvas) }
     }
 
-    // --- 外部（Activity）からのポーズ切替 -----------------------------------
-
-    fun setPaused(p: Boolean) {
-        paused = p
-        NativeBridge.setPaused(p) // C++ 側の進行も止める
+    private fun drawPositions(c: Canvas,d:IntArray,start:Int,color:Int,cell:Float,left:Float,top:Float) {
+        for(i in start until start+8 step 2) { val x=d[i]; val y=d[i+1]-2; if(y in 0..19) drawCell(c,x,y,color,cell,left,top) }
     }
+    private fun drawCell(c:Canvas,x:Int,y:Int,color:Int,cell:Float,left:Float,top:Float) {
+        paint.style=Paint.Style.FILL; paint.color=color; c.drawRect(left+x*cell,top+y*cell,left+(x+1)*cell,top+(y+1)*cell,paint)
+        paint.style=Paint.Style.STROKE; paint.color=0xFF202020.toInt(); c.drawRect(left+x*cell,top+y*cell,left+(x+1)*cell,top+(y+1)*cell,paint)
+    }
+    private fun overlay(c:Canvas,text:String) { paint.textAlign=Paint.Align.CENTER; paint.textSize=28f*scaledDensity; text.lines().forEachIndexed{i,s->c.drawText(s,width/2f,height/2f+i*34f*density,paint)}; paint.textAlign=Paint.Align.LEFT }
+    private fun formatTime()="%02d:%02d".format((elapsedSec/60).toInt(),(elapsedSec%60).toInt())
+    private fun newSeed()=(System.nanoTime() xor System.currentTimeMillis()).toInt()
 
-    fun isPaused(): Boolean = paused
+    private companion object { const val PAUSE=100; const val RESUME=101; const val RESTART=102 }
 }
