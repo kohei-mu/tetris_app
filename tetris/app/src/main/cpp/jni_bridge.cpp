@@ -1,70 +1,43 @@
 #include <jni.h>
-#include <vector>
+#include <array>
 #include "game.hpp"
 
-static Game g;
-
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_game_tetris_NativeBridge_update(JNIEnv* /*env*/, jobject /*thiz*/, jfloat dt) {
-    g.step(dt);
-}
+namespace { Game game; }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_game_tetris_NativeBridge_command(JNIEnv* /*env*/, jobject /*thiz*/, jint cmd) {
-    g.command((Command)cmd);
+Java_com_game_tetris_NativeBridge_update(JNIEnv*, jobject, jfloat dt) { game.step(dt); }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_game_tetris_NativeBridge_command(JNIEnv*, jobject, jint command) {
+    game.command(static_cast<Command>(command));
 }
 
+// Compact primitive snapshot: board, active coordinates, ghost coordinates,
+// score, level, paused, gameOver. It is copied from one coherent native state.
 extern "C" JNIEXPORT jintArray JNICALL
-Java_com_game_tetris_NativeBridge_readBoard(JNIEnv* env, jobject /*thiz*/) {
-    const auto& b = g.board();
-    jintArray arr = env->NewIntArray(W*H);
-    std::vector<jint> tmp(W*H);
-    for (int i = 0; i < W*H; ++i) tmp[i] = static_cast<jint>(b[i]);
-    env->SetIntArrayRegion(arr, 0, W*H, tmp.data());
-    return arr;
-}
-
-extern "C" JNIEXPORT jintArray JNICALL
-Java_com_game_tetris_NativeBridge_ghostPositions(JNIEnv* env, jobject /*thiz*/) {
-    auto gpos = g.ghostPositions();
-    jintArray arr = env->NewIntArray(8);
-    jint tmp[8];
-    for(int i=0;i<8;++i) tmp[i] = gpos[i];
-    env->SetIntArrayRegion(arr, 0, 8, tmp);
-    return arr;
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_game_tetris_NativeBridge_score(JNIEnv* /*env*/, jobject /*thiz*/) {
-    return g.score();
-}
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_game_tetris_NativeBridge_level(JNIEnv* /*env*/, jobject /*thiz*/) {
-    return g.level();
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_game_tetris_NativeBridge_isGameOver(JNIEnv* /*env*/, jobject /*thiz*/) {
-    return g.gameOver() ? JNI_TRUE : JNI_FALSE;
+Java_com_game_tetris_NativeBridge_renderSnapshot(JNIEnv* env, jobject) {
+    constexpr int size = W * H + 8 + 8 + 4;
+    std::array<jint, size> values{};
+    const RenderSnapshot snapshot = game.snapshot();
+    int index = 0;
+    for (uint8_t cell : snapshot.board) values[index++] = cell;
+    for (int coordinate : snapshot.active) values[index++] = coordinate;
+    for (int coordinate : snapshot.ghost) values[index++] = coordinate;
+    values[index++] = snapshot.score;
+    values[index++] = snapshot.level;
+    values[index++] = snapshot.paused ? 1 : 0;
+    values[index] = snapshot.gameOver ? 1 : 0;
+    jintArray result = env->NewIntArray(size);
+    env->SetIntArrayRegion(result, 0, size, values.data());
+    return result;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_game_tetris_NativeBridge_setPaused(JNIEnv*, jobject, jboolean p) {
-    g.setPaused(p == JNI_TRUE);
-}
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_game_tetris_NativeBridge_isPaused(JNIEnv*, jobject) {
-    return g.isPaused() ? JNI_TRUE : JNI_FALSE;
+Java_com_game_tetris_NativeBridge_setPaused(JNIEnv*, jobject, jboolean paused) {
+    game.setPaused(paused == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_game_tetris_NativeBridge_init(JNIEnv*, jobject) {
-    g.reset(0); // 互換用（固定seed）
+Java_com_game_tetris_NativeBridge_restart(JNIEnv*, jobject, jint seed) {
+    game.reset(static_cast<uint32_t>(seed));
 }
-extern "C" JNIEXPORT void JNICALL
-Java_com_game_tetris_NativeBridge_initWithSeed(JNIEnv*, jobject, jint seed) {
-    g.reset((uint32_t)seed); // ランダム初期化
-}
-

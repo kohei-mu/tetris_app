@@ -23,11 +23,21 @@
         android:layout_marginBottom="12dp"/>
 
     <Button
-        android:id="@+id/btnResume"
+        android:id="@+id/btnPause"
         android:layout_width="120dp" android:layout_height="48dp"
-        android:text="PAUSE"
+        android:text="@string/pause"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnRestart"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:text="@string/restart"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/btnDrop"
+        app:layout_constraintEnd_toStartOf="@id/btnPause"
         android:layout_marginBottom="12dp"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

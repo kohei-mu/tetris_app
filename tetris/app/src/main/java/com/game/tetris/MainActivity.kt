@@ -5,36 +5,18 @@ import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var gameView: GameView
-    private lateinit var btnResume: Button
-    private var paused = false
+    private lateinit var pauseButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        gameView = findViewById(R.id.gameView)
-
-        btnResume = findViewById(R.id.btnResume)
-        btnResume.text = "PAUSE"
-
-        btnResume.setOnClickListener {
-            paused = !paused
-            gameView.setPaused(paused)
-            btnResume.text = if (paused) "RESUME" else "PAUSE"
-        }
-
-        val btnDrop: Button = findViewById(R.id.btnDrop)
-        btnDrop.setOnClickListener {
-            if (!paused) NativeBridge.command(NativeBridge.HARD_DROP)
-        }
+        gameView=findViewById(R.id.gameView); pauseButton=findViewById(R.id.btnPause)
+        pauseButton.setOnClickListener { gameView.togglePause(); pauseButton.postDelayed(::refreshButton,50) }
+        findViewById<Button>(R.id.btnDrop).setOnClickListener { gameView.hardDrop() }
+        findViewById<Button>(R.id.btnRestart).setOnClickListener { gameView.restart(); pauseButton.text=getString(R.string.pause) }
     }
 
-    override fun onPause() {
-        super.onPause()
-        paused = true
-        gameView.setPaused(true)
-        btnResume.text = "RESUME"
-    }
+    override fun onPause() { super.onPause(); gameView.pause(); pauseButton.text=getString(R.string.resume) }
+    private fun refreshButton() { pauseButton.text=getString(if(gameView.isPaused()) R.string.resume else R.string.pause) }
 }
